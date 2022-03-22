@@ -8,7 +8,8 @@ import React, { useState } from "react";
 import { Toaster } from "react-hot-toast";
 import { JSONObject } from "superjson/dist/types";
 
-import { useLocale } from "@lib/hooks/useLocale";
+import { useLocale } from "@calcom/lib/hooks/useLocale";
+
 import useTheme from "@lib/hooks/useTheme";
 import prisma from "@lib/prisma";
 import { inferSSRProps } from "@lib/types/inferSSRProps";
@@ -26,39 +27,40 @@ interface EvtsToVerify {
 }
 
 export default function User(props: inferSSRProps<typeof getServerSideProps>) {
-  const { Theme } = useTheme(props.user.theme);
-  const { user, eventTypes } = props;
+  // console.log("=>", props);
+  const { Theme } = useTheme(props.users[0].theme);
+  const { users, eventTypes } = props;
   const { t } = useLocale();
   const router = useRouter();
   const query = { ...router.query };
   delete query.user; // So it doesn't display in the Link (and make tests fail)
-
-  const nameOrUsername = user.name || user.username || "";
+  // TODO:: Create component to pull default group event type from and then get the group availability to fill slots
+  const nameOrUsername = users[0].name || users[0].username || "";
   const [evtsToVerify, setEvtsToVerify] = useState<EvtsToVerify>({});
   return (
     <>
       <Theme />
       <HeadSeo
         title={nameOrUsername}
-        description={(user.bio as string) || ""}
+        description={(users[0].bio as string) || ""}
         name={nameOrUsername}
-        username={(user.username as string) || ""}
+        username={(users[0].username as string) || ""}
         // avatar={user.avatar || undefined}
       />
       <div className="h-screen dark:bg-black">
         <main className="mx-auto max-w-3xl px-4 py-24">
           <div className="mb-8 text-center">
-            <AvatarSSR user={user} className="mx-auto mb-4 h-24 w-24" alt={nameOrUsername}></AvatarSSR>
+            <AvatarSSR user={users[0]} className="mx-auto mb-4 h-24 w-24" alt={nameOrUsername}></AvatarSSR>
             <h1 className="font-cal mb-1 text-3xl text-neutral-900 dark:text-white">
               {nameOrUsername}
-              {user.verified && (
+              {users[0].verified && (
                 <BadgeCheckIcon className="mx-1 -mt-1 inline h-6 w-6 text-blue-500 dark:text-white" />
               )}
             </h1>
-            <p className="text-neutral-500 dark:text-white">{user.bio}</p>
+            <p className="text-neutral-500 dark:text-white">{users[0].bio}</p>
           </div>
           <div className="space-y-6" data-testid="event-types">
-            {user.away ? (
+            {users[0].away ? (
               <div className="overflow-hidden rounded-sm border dark:border-gray-900">
                 <div className="p-8 text-center text-gray-400 dark:text-white">
                   <h2 className="font-cal mb-2 text-3xl text-gray-600 dark:text-white">
@@ -78,7 +80,7 @@ export default function User(props: inferSSRProps<typeof getServerSideProps>) {
                   <Link
                     prefetch={false}
                     href={{
-                      pathname: `/${user.username}/${type.slug}`,
+                      pathname: `/${users[0].username}/${type.slug}`,
                       query,
                     }}>
                     <a
@@ -102,7 +104,7 @@ export default function User(props: inferSSRProps<typeof getServerSideProps>) {
                   {type.isWeb3Active && type.metadata.smartContractAddress && (
                     <CryptoSection
                       id={type.id}
-                      pathname={`/${user.username}/${type.slug}`}
+                      pathname={`/${users[0].username}/${type.slug}`}
                       smartContractAddress={type.metadata.smartContractAddress as string}
                       verified={evtsToVerify[type.id]}
                       setEvtsToVerify={setEvtsToVerify}
@@ -132,11 +134,14 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
   const ssr = await ssrInit(context);
   const crypto = require("crypto");
 
-  const username = (context.query.user as string).toLowerCase();
+  const usernameList = (context.query.user as string).toLowerCase().split("+");
+  // console.log("list=>", usernameList);
   const dataFetchStart = Date.now();
-  const user = await prisma.user.findUnique({
+  const users = await prisma.user.findMany({
     where: {
-      username: username.toLowerCase(),
+      username: {
+        in: usernameList,
+      },
     },
     select: {
       id: true,
@@ -152,7 +157,7 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
     },
   });
 
-  if (!user) {
+  if (!users) {
     return {
       notFound: true,
     };
@@ -160,7 +165,9 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
 
   const credentials = await prisma.credential.findMany({
     where: {
-      userId: user.id,
+      userId: {
+        in: users.map((user) => user.id),
+      },
     },
     select: {
       id: true,
@@ -171,50 +178,54 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
 
   const web3Credentials = credentials.find((credential) => credential.type.includes("_web3"));
 
-  const eventTypesWithHidden = await prisma.eventType.findMany({
-    where: {
-      AND: [
-        {
-          teamId: null,
-        },
-        {
-          OR: [
+  // console.log("users=>", users);
+  const eventTypesWithHidden =
+    usernameList.length > 1
+      ? []
+      : await prisma.eventType.findMany({
+          where: {
+            AND: [
+              {
+                teamId: null,
+              },
+              {
+                OR: [
+                  {
+                    userId: users[0].id,
+                  },
+                  {
+                    users: {
+                      some: {
+                        id: users[0].id,
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          orderBy: [
             {
-              userId: user.id,
+              position: "desc",
             },
             {
-              users: {
-                some: {
-                  id: user.id,
-                },
-              },
+              id: "asc",
             },
           ],
-        },
-      ],
-    },
-    orderBy: [
-      {
-        position: "desc",
-      },
-      {
-        id: "asc",
-      },
-    ],
-    select: {
-      id: true,
-      slug: true,
-      title: true,
-      length: true,
-      description: true,
-      hidden: true,
-      schedulingType: true,
-      price: true,
-      currency: true,
-      metadata: true,
-    },
-    take: user.plan === "FREE" ? 1 : undefined,
-  });
+          select: {
+            id: true,
+            slug: true,
+            title: true,
+            length: true,
+            description: true,
+            hidden: true,
+            schedulingType: true,
+            price: true,
+            currency: true,
+            metadata: true,
+          },
+          take: users[0].plan === "FREE" ? 1 : undefined,
+        });
   const dataFetchEnd = Date.now();
   if (context.query.log === "1") {
     context.res.setHeader("X-Data-Fetch-Time", `${dataFetchEnd - dataFetchStart}ms`);
@@ -232,9 +243,9 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
 
   return {
     props: {
+      users,
       user: {
-        ...user,
-        emailMd5: crypto.createHash("md5").update(user.email).digest("hex"),
+        emailMd5: crypto.createHash("md5").update(users[0].email).digest("hex"),
       },
       eventTypes,
       trpcState: ssr.dehydrate(),
