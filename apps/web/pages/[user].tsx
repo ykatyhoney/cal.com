@@ -10,6 +10,7 @@ import { JSONObject } from "superjson/dist/types";
 
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 
+import defaultEvents, { getUsernameSlugLink } from "@lib/events/defaultEvents";
 import useTheme from "@lib/hooks/useTheme";
 import prisma from "@lib/prisma";
 import { inferSSRProps } from "@lib/types/inferSSRProps";
@@ -28,8 +29,10 @@ interface EvtsToVerify {
 
 export default function User(props: inferSSRProps<typeof getServerSideProps>) {
   // console.log("=>", props);
+  const eventTypes = props.users.length > 1 ? defaultEvents : props.eventTypes;
+  console.log("et;=>", getUsernameSlugLink({ users: props.users, slug: "30min" }));
   const { Theme } = useTheme(props.users[0].theme);
-  const { users, eventTypes } = props;
+  const { users } = props;
   const { t } = useLocale();
   const router = useRouter();
   const query = { ...router.query };
@@ -80,7 +83,7 @@ export default function User(props: inferSSRProps<typeof getServerSideProps>) {
                   <Link
                     prefetch={false}
                     href={{
-                      pathname: `/${users[0].username}/${type.slug}`,
+                      pathname: getUsernameSlugLink({ users: props.users, slug: type.slug }),
                       query,
                     }}>
                     <a
