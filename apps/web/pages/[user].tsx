@@ -29,7 +29,6 @@ interface EvtsToVerify {
 }
 
 export default function User(props: inferSSRProps<typeof getServerSideProps>) {
-  // console.log("=>", props);
   const eventTypes = props.users.length > 1 ? defaultEvents : props.eventTypes;
   const groupEventTypes = (
     <ul className="space-y-3">
@@ -62,7 +61,6 @@ export default function User(props: inferSSRProps<typeof getServerSideProps>) {
       ))}
     </ul>
   );
-  console.log("et;=>", getUsernameSlugLink({ users: props.users, slug: "30min" }));
   const { Theme } = useTheme(props.users[0].theme);
   const { users } = props;
   const { t } = useLocale();
@@ -174,7 +172,6 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
   const crypto = require("crypto");
 
   const usernameList = (context.query.user as string).toLowerCase().split("+");
-  // console.log("list=>", usernameList);
   const dataFetchStart = Date.now();
   const users = await prisma.user.findMany({
     where: {
@@ -217,7 +214,6 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
 
   const web3Credentials = credentials.find((credential) => credential.type.includes("_web3"));
 
-  // console.log("users=>", users);
   const eventTypesWithHidden =
     usernameList.length > 1
       ? []
