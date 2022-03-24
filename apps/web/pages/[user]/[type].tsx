@@ -175,10 +175,7 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
   }
 
   // check this is the first event
-
-  // TEMPORARILY disabled because of a bug during event create - during which users were able
-  // to create event types >n1.
-  /*if (user.plan === "FREE") {
+  if (user.plan === "FREE") {
     const firstEventType = await prisma.eventType.findFirst({
       where: {
         OR: [
@@ -203,7 +200,7 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
         notFound: true,
       } as const;
     }
-  }*/
+  }
 
   const eventTypeObject =
     users.length > 1
