@@ -10,12 +10,13 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
+import { useLocale } from "@calcom/lib/hooks/useLocale";
 import Button from "@calcom/ui/Button";
 import { EmailInput } from "@calcom/ui/form/fields";
 
 import { asStringOrThrow, asStringOrNull } from "@lib/asStringOrNull";
 import { getEventName } from "@lib/event";
-import { useLocale } from "@lib/hooks/useLocale";
+import { getDefaultEvent } from "@lib/events/DefaultEvents";
 import useTheme from "@lib/hooks/useTheme";
 import { isBrandingHidden } from "@lib/isBrandingHidden";
 import prisma from "@lib/prisma";
@@ -295,6 +296,7 @@ export default function Success(props: inferSSRProps<typeof getServerSideProps>)
 export async function getServerSideProps(context: GetServerSidePropsContext) {
   const ssr = await ssrInit(context);
   const typeId = parseInt(asStringOrNull(context.query.type) ?? "");
+  const typeSlug = asStringOrNull(context.query.eventSlug) ?? "15min";
 
   if (isNaN(typeId)) {
     return {
@@ -302,36 +304,38 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
     };
   }
 
-  const eventType = await prisma.eventType.findUnique({
-    where: {
-      id: typeId,
-    },
-    select: {
-      id: true,
-      title: true,
-      description: true,
-      length: true,
-      eventName: true,
-      requiresConfirmation: true,
-      userId: true,
-      users: {
-        select: {
-          name: true,
-          hideBranding: true,
-          plan: true,
-          theme: true,
-          brandColor: true,
-          darkBrandColor: true,
+  const eventType = !typeId
+    ? getDefaultEvent(typeSlug)
+    : await prisma.eventType.findUnique({
+        where: {
+          id: typeId,
         },
-      },
-      team: {
         select: {
-          name: true,
-          hideBranding: true,
+          id: true,
+          title: true,
+          description: true,
+          length: true,
+          eventName: true,
+          requiresConfirmation: true,
+          userId: true,
+          users: {
+            select: {
+              name: true,
+              hideBranding: true,
+              plan: true,
+              theme: true,
+              brandColor: true,
+              darkBrandColor: true,
+            },
+          },
+          team: {
+            select: {
+              name: true,
+              hideBranding: true,
+            },
+          },
         },
-      },
-    },
-  });
+      });
 
   if (!eventType) {
     return {
