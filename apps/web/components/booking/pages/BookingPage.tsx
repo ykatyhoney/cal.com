@@ -249,6 +249,7 @@ const BookingPage = ({ eventType, booking, profile }: BookingPageProps) => {
       start: dayjs(date).format(),
       end: dayjs(date).add(eventType.length, "minute").format(),
       eventTypeId: eventType.id,
+      eventTypeSlug: eventType.slug,
       timeZone: timeZone(),
       language: i18n.language,
       rescheduleUid,
